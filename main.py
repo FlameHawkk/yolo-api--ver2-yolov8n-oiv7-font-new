@@ -26,7 +26,7 @@ app.add_middleware(
 ANNOTATION_CONFIG = {
     # Коэффициенты для расчета толщины рамки
     'line_thickness_base': 5,           # Базовая толщина для изображения высотой 800px
-    'line_thickness_min': 1.8,          # Минимальная толщина
+    'line_thickness_min': 2,            # Минимальная толщина
     'line_thickness_max': 8,            # Максимальная толщина
     
     # Коэффициенты для расчета размера шрифта
@@ -335,8 +335,8 @@ def calculate_font_size(image_height):
     base_height = 800
     
     font_size = max(int(config['font_size_base'] * (image_height / base_height)), 
-                    config['font_size_min'])
-    font_size = min(font_size, config['font_size_max'])
+                    int(config['font_size_min']))  # Приводим min к int
+    font_size = min(font_size, int(config['font_size_max']))  # Приводим max к int
     
     return font_size
 
@@ -349,14 +349,14 @@ def calculate_line_thickness(image_height):
     base_height = 800
     
     thickness = max(int(config['line_thickness_base'] * (image_height / base_height)), 
-                    config['line_thickness_min'])
-    thickness = min(thickness, config['line_thickness_max'])
+                    int(config['line_thickness_min']))  # Приводим min к int
+    thickness = min(thickness, int(config['line_thickness_max']))  # Приводим max к int
     
     return thickness
 
 def create_custom_annotated_image(image, results, detections, language):
     """
-    СОЗДАНИЕ АННОТИРОВАННОГО ИЗОБРАЖЕНИЯ С ПЕРЕВЕДЕННЫМИ МЕТКАМИ
+    Создание аннотированного изображения с переведенными метками
     """
     # Получаем конфигурационные параметры
     config = ANNOTATION_CONFIG
@@ -375,8 +375,8 @@ def create_custom_annotated_image(image, results, detections, language):
     
     # ШАГ 2: НАСТРОЙКА ШРИФТА И ПАРАМЕТРОВ
     # Вычисляем
-    font_size = calculate_font_size(image_height)
-    line_thickness = calculate_line_thickness(image_height)
+    font_size = int(calculate_font_size(image_height))  # Приводим к int
+    line_thickness = int(calculate_line_thickness(image_height))  # Приводим к int
     padding = config['text_padding']
     text_offset = config['text_offset']
     
@@ -399,7 +399,7 @@ def create_custom_annotated_image(image, results, detections, language):
     
     if boxes is not None:
         for i, box in enumerate(boxes):
-            # Координаты bounding box
+            # Координаты bounding box - приводим к int
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
             confidence = float(box.conf) # Уверенность
             class_id = int(box.cls) # ID класса
@@ -420,7 +420,7 @@ def create_custom_annotated_image(image, results, detections, language):
             text_color = get_contrast_text_color(box_color)
             
             # Рисуем bounding box с настроенной толщиной
-            draw.rectangle([x1, y1, x2, y2], outline=box_color, width=line_thickness)
+            draw.rectangle([int(x1), int(y1), int(x2), int(y2)], outline=box_color, width=line_thickness)
             
             # Расчет размера текста
             try:
@@ -441,20 +441,20 @@ def create_custom_annotated_image(image, results, detections, language):
                 text_x = x1 + padding
                 text_y = y1 - text_height - padding - text_offset
                 background_rect = [
-                    x1, 
-                    y1 - total_text_height - text_offset, 
-                    x1 + total_text_width, 
-                    y1
+                    int(x1), 
+                    int(y1 - total_text_height - text_offset), 
+                    int(x1 + total_text_width), 
+                    int(y1)
                 ]
             else:
                 # Места сверху нет - внутри bounding box
                 text_x = x1 + padding
                 text_y = y1 + padding
                 background_rect = [
-                    x1, 
-                    y1, 
-                    x1 + total_text_width, 
-                    y1 + total_text_height
+                    int(x1), 
+                    int(y1), 
+                    int(x1 + total_text_width), 
+                    int(y1 + total_text_height)
                 ]
             
             # Защита от выхода за правую границу
@@ -466,7 +466,7 @@ def create_custom_annotated_image(image, results, detections, language):
             
             # Рисуем подложку и текст
             draw.rectangle(background_rect, fill=box_color)
-            draw.text((text_x, text_y), label_text, fill=text_color, font=font)
+            draw.text((int(text_x), int(text_y)), label_text, fill=text_color, font=font)
     
     return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
 
