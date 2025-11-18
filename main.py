@@ -363,13 +363,10 @@ def create_custom_annotated_image(image, results, detections, language):
     
     # ШАГ 1: ПОДГОТОВКА ИЗОБРАЖЕНИЯ
     # Конвертируем numpy array в PIL Image
-    if image.shape[2] == 3:
-        pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    else:
-        pil_image = Image.fromarray(image)
+    pil_image = Image.fromarray(image)
     
     draw = ImageDraw.Draw(pil_image)
-
+    
     # Получаем размеры изображения для масштабирования
     image_width, image_height = pil_image.size
     
@@ -399,7 +396,7 @@ def create_custom_annotated_image(image, results, detections, language):
     
     if boxes is not None:
         for i, box in enumerate(boxes):
-            # Координаты bounding box - приводим к int
+            # Координаты bounding box (приводим к int)
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
             confidence = float(box.conf) # Уверенность
             class_id = int(box.cls) # ID класса
@@ -437,7 +434,7 @@ def create_custom_annotated_image(image, results, detections, language):
             
             # УМНОЕ РАЗМЕЩЕНИЕ ТЕКСТА
             if y1 - total_text_height - text_offset >= 0:
-                # Места сверху достаточно - над bounding box
+                # Если места сверху достаточно - над bounding box
                 text_x = x1 + padding
                 text_y = y1 - text_height - padding - text_offset
                 background_rect = [
@@ -447,7 +444,7 @@ def create_custom_annotated_image(image, results, detections, language):
                     int(y1)
                 ]
             else:
-                # Места сверху нет - внутри bounding box
+                # Еси места сверху нет - внутри bounding box
                 text_x = x1 + padding
                 text_y = y1 + padding
                 background_rect = [
@@ -468,7 +465,7 @@ def create_custom_annotated_image(image, results, detections, language):
             draw.rectangle(background_rect, fill=box_color)
             draw.text((int(text_x), int(text_y)), label_text, fill=text_color, font=font)
     
-    return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+    return np.array(pil_image)
 
 @app.on_event("startup")
 async def startup_event():
@@ -520,7 +517,8 @@ async def predict(
                 status_code=400, 
                 detail="Неподдерживаемый язык. Используйте 'en' или 'ru'"
             )
-        
+
+        # Проверяем корректность порога уверенности (от 0 до 1) 
         if confidence < 0 or confidence > 1:
             raise HTTPException(
                 status_code=400,
@@ -538,20 +536,18 @@ async def predict(
         
         # Открываем изображение с помощью PIL
         image = Image.open(io.BytesIO(image_data))
+
+        # Конвертируем в RGB если нужно (для PNG с альфа-каналом)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
+            print("🔄 Конвертирован в RGB")
+      
         image_array = np.array(image)
         print(f"🖼️ Размер изображения: {image_array.shape}")
         
-        # Конвертируем цветовое пространство при необходимости
-        if len(image_array.shape) == 3 and image_array.shape[2] == 4:
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_RGBA2RGB)
-            print("🔄 Конвертирован RGBA -> RGB")
-        elif len(image_array.shape) == 3:
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
-            print("🔄 Конвертирован BGR -> RGB")
-        
         # Выполняем предсказание с помощью YOLO модели
         print(f"🔍 Выполнение предсказания YOLO с уверенностью {confidence}...")
-        # Примечание: используем встроенную фильтрацию YOLO       
+        # примечание: используем встроенную фильтрацию YOLO       
         results = current_model(image_array, conf=confidence, verbose=True)
         
         print(f"📊 YOLO обнаружено результатов: {len(results)}")
@@ -589,14 +585,17 @@ async def predict(
         # Сортируем по уверенности (от высокой к низкой)
         detections.sort(key=lambda x: x['confidence'], reverse=True)
         
-        # Создаем аннотированное изображение с ПЕРЕВЕДЕННЫМИ метками
+        # Создаем аннотированное изображение с переведенными метками
         print("🖌️ Создаем аннотированное изображение с переведенными метками...")
         annotated_image = create_custom_annotated_image(
             image_array, results, detections, language
         )
         
         # Конвертируем изображение в base64 для передачи в ответе
-        _, buffer = cv2.imencode('.jpg', annotated_image)
+        annotated_pil = Image.fromarray(annotated_image)
+        buffered = io.BytesIO()
+        annotated_pil.save(buffered, format="JPEG", quality=95)
+        
         import base64
         image_base64 = base64.b64encode(buffer).decode('utf-8')
         
