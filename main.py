@@ -597,7 +597,7 @@ async def predict(
         annotated_pil.save(buffered, format="JPEG", quality=95)
         
         import base64
-        image_base64 = base64.b64encode(buffer).decode('utf-8')
+        image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         print(f"🎉 Успешно завершено. Возвращаем {len(detections)} детекций")
         
