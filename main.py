@@ -664,7 +664,7 @@ async def root():
     """Корневой endpoint с основной информацией о API"""
     return {
         "message": "YOLO Object Detection API",
-        "version": "1.4.0",
+        "version": "2.5.1",
         "endpoints": {
             "/predict/": "POST - выполнить детекцию объектов на изображении",
             "/health": "GET - проверить состояние сервера", 
